@@ -31,5 +31,8 @@
     <ClInclude Include="sgemm.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
+    <ClInclude Include="sgemm_common_def.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
