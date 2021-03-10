@@ -29,6 +29,20 @@ int sgemm_ocl(const float* p_a_f32, const float* p_b_f32, float* p_c_f32)
 	FILE *kernelFile;
 	char *kernelSource;
 	size_t kernelSize;
+	cl_platform_id platformId = NULL;
+	cl_device_id deviceID = NULL;
+	cl_uint retNumDevices;
+	cl_uint retNumPlatforms;
+	cl_program program;
+	cl_kernel kernel;
+	const size_t local[2] = { TS_X, TS_Y };
+	const size_t global[2] = { SIZE_M, SIZE_N };
+	int m_s32 = SIZE_M;
+	int n_s32 = SIZE_N;
+	int k_s32 = SIZE_K;
+	cl_event event;
+	cl_int ret;
+	int j_s32 = 0;
 
 	fopen_s(&kernelFile, "sgemmKernel.cl", "r");
 
@@ -49,11 +63,7 @@ int sgemm_ocl(const float* p_a_f32, const float* p_b_f32, float* p_c_f32)
 	fclose(kernelFile);
 
 	// Getting platform and device information
-	cl_platform_id platformId = NULL;
-	cl_device_id deviceID = NULL;
-	cl_uint retNumDevices;
-	cl_uint retNumPlatforms;
-	cl_int ret = clGetPlatformIDs(1, &platformId, &retNumPlatforms);
+	ret = clGetPlatformIDs(1, &platformId, &retNumPlatforms);
 	if (ret != CL_SUCCESS)
 	{
 		printf("clGetPlatformIDs failed! %d\n", ret);
@@ -159,22 +169,8 @@ int sgemm_ocl(const float* p_a_f32, const float* p_b_f32, float* p_c_f32)
 		exit(-1);
 	}
 
-	// Copy lists to memory buffers
-	ret = clEnqueueWriteBuffer(commandQueue, aMemObj, CL_TRUE, 0, SIZE_K * SIZE_M * sizeof(float), p_a_f32, 0, NULL, NULL);;
-	if (ret != CL_SUCCESS)
-	{
-		printf("clEnqueueWriteBuffer failed! %d\n", ret);
-		exit(-1);
-	}
-	ret = clEnqueueWriteBuffer(commandQueue, bMemObj, CL_TRUE, 0, SIZE_K * SIZE_N * sizeof(float), p_b_f32, 0, NULL, NULL);
-	if (ret != CL_SUCCESS)
-	{
-		printf("clEnqueueWriteBuffer failed! %d\n", ret);
-		exit(-1);
-	}
-
 	// Create program from kernel source
-	cl_program program = clCreateProgramWithSource(context, 1, (const char **)&kernelSource, (const size_t *)&kernelSize, &ret);	
+	program = clCreateProgramWithSource(context, 1, (const char**)&kernelSource, (const size_t*)&kernelSize, &ret);
 	if (ret != CL_SUCCESS)
 	{
 		printf("clCreateProgramWithSource failed! %d\n", ret);
@@ -189,79 +185,89 @@ int sgemm_ocl(const float* p_a_f32, const float* p_b_f32, float* p_c_f32)
 		exit(-1);
 	}
 
-	// Create kernel
-	cl_kernel kernel = clCreateKernel(program, "myGEMM2", &ret);
-	if (ret != CL_SUCCESS)
+	for (j_s32 = 0; j_s32 < ITERATION; ++j_s32)
 	{
-		printf("clCreateKernel failed! %d\n", ret);
-		exit(-1);
-	}
+		// Copy lists to memory buffers
+		ret = clEnqueueWriteBuffer(commandQueue, aMemObj, CL_TRUE, 0, SIZE_K * SIZE_M * sizeof(float), &p_a_f32[j_s32 * SIZE_K * SIZE_M], 0, NULL, NULL);;
+		if (ret != CL_SUCCESS)
+		{
+			printf("clEnqueueWriteBuffer failed! %d\n", ret);
+			exit(-1);
+		}
+		ret = clEnqueueWriteBuffer(commandQueue, bMemObj, CL_TRUE, 0, SIZE_K * SIZE_N * sizeof(float), &p_b_f32[j_s32 * SIZE_K * SIZE_M], 0, NULL, NULL);
+		if (ret != CL_SUCCESS)
+		{
+			printf("clEnqueueWriteBuffer failed! %d\n", ret);
+			exit(-1);
+		}
 
-	int m_s32 = SIZE_M;
-	int n_s32 = SIZE_N;
-	int k_s32 = SIZE_K;
+		// Create kernel
+		kernel = clCreateKernel(program, "myGEMM2", &ret);
+		if (ret != CL_SUCCESS)
+		{
+			printf("clCreateKernel failed! %d\n", ret);
+			exit(-1);
+		}
 
-	// Set arguments for kernel
-	ret = clSetKernelArg(kernel, 0, sizeof(int), (void*)&m_s32);
-	if (ret != CL_SUCCESS)
-	{
-		printf("clSetKernelArg failed! %d\n", ret);
-		exit(-1);
-	}
-	ret = clSetKernelArg(kernel, 1, sizeof(int), (void*)&n_s32);
-	if (ret != CL_SUCCESS)
-	{
-		printf("clSetKernelArg failed! %d\n", ret);
-		exit(-1);
-	}
-	ret = clSetKernelArg(kernel, 2, sizeof(int), (void*)&k_s32);
-	if (ret != CL_SUCCESS)
-	{
-		printf("clSetKernelArg failed! %d\n", ret);
-		exit(-1);
-	}
-	ret = clSetKernelArg(kernel, 3, sizeof(cl_mem), (void*)&aMemObj);
-	if (ret != CL_SUCCESS)
-	{
-		printf("clSetKernelArg failed! %d\n", ret);
-		exit(-1);
-	}
-	ret = clSetKernelArg(kernel, 4, sizeof(cl_mem), (void*)&bMemObj);
-	if (ret != CL_SUCCESS)
-	{
-		printf("clSetKernelArg failed! %d\n", ret);
-		exit(-1);
-	}
-	ret = clSetKernelArg(kernel, 5, sizeof(cl_mem), (void*)&cMemObj);
-	if (ret != CL_SUCCESS)
-	{
-		printf("clSetKernelArg failed! %d\n", ret);
-		exit(-1);
-	}
+		// Set arguments for kernel
+		ret = clSetKernelArg(kernel, 0, sizeof(int), (void*)&m_s32);
+		if (ret != CL_SUCCESS)
+		{
+			printf("clSetKernelArg failed! %d\n", ret);
+			exit(-1);
+		}
+		ret = clSetKernelArg(kernel, 1, sizeof(int), (void*)&n_s32);
+		if (ret != CL_SUCCESS)
+		{
+			printf("clSetKernelArg failed! %d\n", ret);
+			exit(-1);
+		}
+		ret = clSetKernelArg(kernel, 2, sizeof(int), (void*)&k_s32);
+		if (ret != CL_SUCCESS)
+		{
+			printf("clSetKernelArg failed! %d\n", ret);
+			exit(-1);
+		}
+		ret = clSetKernelArg(kernel, 3, sizeof(cl_mem), (void*)&aMemObj);
+		if (ret != CL_SUCCESS)
+		{
+			printf("clSetKernelArg failed! %d\n", ret);
+			exit(-1);
+		}
+		ret = clSetKernelArg(kernel, 4, sizeof(cl_mem), (void*)&bMemObj);
+		if (ret != CL_SUCCESS)
+		{
+			printf("clSetKernelArg failed! %d\n", ret);
+			exit(-1);
+		}
+		ret = clSetKernelArg(kernel, 5, sizeof(cl_mem), (void*)&cMemObj);
+		if (ret != CL_SUCCESS)
+		{
+			printf("clSetKernelArg failed! %d\n", ret);
+			exit(-1);
+		}
 
-	// Execute the kernel
-	const size_t local[2] = { TS_X, TS_Y };
-	const size_t global[2] = { SIZE_M, SIZE_N };
-	cl_event event;
-	ret = clEnqueueNDRangeKernel(commandQueue, kernel, 2, NULL, global, local, 0, NULL, &event);
-	if (ret != CL_SUCCESS)
-	{
-		printf("clEnqueueNDRangeKernel failed! %d\n", ret);
-		exit(-1);
-	}
-	ret = clWaitForEvents(1, &event);
-	if (ret != CL_SUCCESS)
-	{
-		printf("clWaitForEvents failed! %d\n", ret);
-		exit(-1);
-	}
+		// Execute the kernel
+		ret = clEnqueueNDRangeKernel(commandQueue, kernel, 2, NULL, global, local, 0, NULL, &event);
+		if (ret != CL_SUCCESS)
+		{
+			printf("clEnqueueNDRangeKernel failed! %d\n", ret);
+			exit(-1);
+		}
+		ret = clWaitForEvents(1, &event);
+		if (ret != CL_SUCCESS)
+		{
+			printf("clWaitForEvents failed! %d\n", ret);
+			exit(-1);
+		}
 
-	// Read from device back to host.
-	ret = clEnqueueReadBuffer(commandQueue, cMemObj, CL_TRUE, 0, SIZE_M * SIZE_N * sizeof(float), p_c_f32, 0, NULL, NULL);
-	if (ret != CL_SUCCESS)
-	{
-		printf("clEnqueueReadBuffer failed! %d\n", ret);
-		exit(-1);
+		// Read from device back to host.
+		ret = clEnqueueReadBuffer(commandQueue, cMemObj, CL_TRUE, 0, SIZE_M * SIZE_N * sizeof(float), &p_c_f32[j_s32 * SIZE_K * SIZE_M], 0, NULL, NULL);
+		if (ret != CL_SUCCESS)
+		{
+			printf("clEnqueueReadBuffer failed! %d\n", ret);
+			exit(-1);
+		}
 	}
 
 	// Clean up, release memory.

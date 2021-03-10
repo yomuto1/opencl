@@ -4,10 +4,10 @@
 #include "sgemm.h"
 #include "sgemm_common_def.h"
 
-static float sa_a_f32[ITERATION][SIZE_K * SIZE_M];
-static float sa_b_f32[ITERATION][SIZE_K * SIZE_N];
-static float sa_alg_c_f32[ITERATION][SIZE_M * SIZE_N];
-static float sa_ocl_c_f32[ITERATION][SIZE_M * SIZE_N];
+static float sa_a_f32[ITERATION * SIZE_K * SIZE_M];
+static float sa_b_f32[ITERATION * SIZE_K * SIZE_N];
+static float sa_alg_c_f32[ITERATION * SIZE_M * SIZE_N];
+static float sa_ocl_c_f32[ITERATION * SIZE_M * SIZE_N];
 
 int main(int argc, char ** argv)
 {
@@ -20,20 +20,17 @@ int main(int argc, char ** argv)
 	{
 		for (i_s32 = 0; i_s32 < SIZE_K * SIZE_M; ++i_s32)
 		{
-			sa_a_f32[j_s32][i_s32] = (i_s32 * 0.32f) - 1000.f + j_s32 * 10.f;
+			sa_a_f32[j_s32 * SIZE_K * SIZE_M + i_s32] = (i_s32 * 0.32f) - 1000.f + j_s32 * 10.f;
 		}
 		for (i_s32 = 0; i_s32 < SIZE_K * SIZE_N; ++i_s32)
 		{
-			sa_b_f32[j_s32][i_s32] = 2500.f - (i_s32 * 0.27f) + j_s32 * 10.f;
+			sa_b_f32[j_s32 * SIZE_K * SIZE_M + i_s32] = 2500.f - (i_s32 * 0.27f) + j_s32 * 10.f;
 		}
 	}
 
 	start_point = clock();
 
-	for (j_s32 = 0; j_s32 < ITERATION; ++j_s32)
-	{
-		sgemm_ocl(sa_a_f32[j_s32], sa_b_f32[j_s32], sa_ocl_c_f32[j_s32]);
-	}
+	sgemm_ocl(sa_a_f32, sa_b_f32, sa_ocl_c_f32);
 
 	end_point = clock();
 
@@ -43,7 +40,7 @@ int main(int argc, char ** argv)
 
 	for (j_s32 = 0; j_s32 < ITERATION; ++j_s32)
 	{
-		sgemm_alg(sa_a_f32[j_s32], sa_b_f32[j_s32], sa_alg_c_f32[j_s32]);
+		sgemm_alg(&sa_a_f32[j_s32 * SIZE_K * SIZE_M], &sa_b_f32[j_s32 * SIZE_K * SIZE_M], &sa_alg_c_f32[j_s32 * SIZE_K * SIZE_M]);
 	}
 
     end_point = clock();
@@ -55,9 +52,9 @@ int main(int argc, char ** argv)
 	{
 		for (i_s32 = 0; i_s32 < SIZE_M * SIZE_N; ++i_s32)
 		{
-			if (sa_alg_c_f32[j_s32][i_s32] != sa_ocl_c_f32[j_s32][i_s32])
+			if (sa_alg_c_f32[j_s32 * SIZE_K * SIZE_M + i_s32] != sa_ocl_c_f32[j_s32 * SIZE_K * SIZE_M + i_s32])
 			{
-				printf("mismatch: %d %d  %f %f\n", i_s32, j_s32, sa_alg_c_f32[j_s32][i_s32], sa_ocl_c_f32[j_s32][i_s32]);
+				printf("mismatch: %d %d  %f %f\n", i_s32, j_s32, sa_alg_c_f32[j_s32 * SIZE_K * SIZE_M + i_s32], sa_ocl_c_f32[j_s32 * SIZE_K * SIZE_M + i_s32]);
 				break;
 			}
 		}
