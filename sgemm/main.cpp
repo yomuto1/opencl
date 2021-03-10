@@ -24,7 +24,7 @@ int main(int argc, char ** argv)
 		}
 		for (i_s32 = 0; i_s32 < SIZE_K * SIZE_N; ++i_s32)
 		{
-			sa_b_f32[j_s32 * SIZE_K * SIZE_M + i_s32] = 2500.f - (i_s32 * 0.27f) + j_s32 * 10.f;
+			sa_b_f32[j_s32 * SIZE_K * SIZE_N + i_s32] = 2500.f - (i_s32 * 0.27f) + j_s32 * 10.f;
 		}
 	}
 
@@ -40,7 +40,7 @@ int main(int argc, char ** argv)
 
 	for (j_s32 = 0; j_s32 < ITERATION; ++j_s32)
 	{
-		sgemm_alg(&sa_a_f32[j_s32 * SIZE_K * SIZE_M], &sa_b_f32[j_s32 * SIZE_K * SIZE_M], &sa_alg_c_f32[j_s32 * SIZE_K * SIZE_M]);
+		sgemm_alg(&sa_a_f32[j_s32 * SIZE_K * SIZE_M], &sa_b_f32[j_s32 * SIZE_K * SIZE_N], &sa_alg_c_f32[j_s32 * SIZE_M * SIZE_N]);
 	}
 
     end_point = clock();
@@ -52,9 +52,9 @@ int main(int argc, char ** argv)
 	{
 		for (i_s32 = 0; i_s32 < SIZE_M * SIZE_N; ++i_s32)
 		{
-			if (sa_alg_c_f32[j_s32 * SIZE_K * SIZE_M + i_s32] != sa_ocl_c_f32[j_s32 * SIZE_K * SIZE_M + i_s32])
+			if (sa_alg_c_f32[j_s32 * SIZE_M * SIZE_N + i_s32] != sa_ocl_c_f32[j_s32 * SIZE_M * SIZE_N + i_s32])
 			{
-				printf("mismatch: %d %d  %f %f\n", i_s32, j_s32, sa_alg_c_f32[j_s32 * SIZE_K * SIZE_M + i_s32], sa_ocl_c_f32[j_s32 * SIZE_K * SIZE_M + i_s32]);
+				printf("mismatch: %d %d  %f %f\n", i_s32, j_s32, sa_alg_c_f32[j_s32 * SIZE_M * SIZE_N + i_s32], sa_ocl_c_f32[j_s32 * SIZE_M * SIZE_N + i_s32]);
 				break;
 			}
 		}
