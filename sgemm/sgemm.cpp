@@ -8,7 +8,7 @@
 
 #define MAX_SOURCE_SIZE (0x100000)
 
-int sgemm_alg(const float* p_a_f32, const float* p_b_f32, float* p_c_f32)
+int sgemm_alg(const float* __restrict p_a_f32, const float* __restrict p_b_f32, float* __restrict p_c_f32)
 {
 	for (int m = 0; m < SIZE_M; m++) {
 		for (int n = 0; n < SIZE_N; n++) {
